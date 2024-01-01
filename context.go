@@ -1231,3 +1231,66 @@ func (c *Context) Value(key any) any {
 	}
 	return c.Request.Context().Value(key)
 }
+
+// !!! Custom
+
+// Dump
+func (c *Context) Dump() *Context {
+	ctx := c.engine.pool.Get().(*Context)
+	ctx.writermem.reset(nil)
+	ctx.reset()
+
+	return c.DumpTo(ctx)
+}
+
+// DumpTo
+func (c *Context) DumpTo(ctx *Context) *Context {
+	if ctx == nil {
+		panic("nil context")
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	ctx.writermem = c.writermem
+	ctx.Request = c.Request
+	ctx.Writer = &ctx.writermem
+
+	ctx.Params = c.Params
+	paramCopy := make([]Param, len(ctx.Params))
+	copy(paramCopy, ctx.Params)
+	ctx.Params = paramCopy
+
+	ctx.handlers = c.handlers
+	ctx.index = c.index
+	ctx.fullPath = c.fullPath
+	ctx.engine = c.engine
+	// ctx.params = c.params
+	// ctx.skippedNodes = c.skippedNodes
+	// mu sync.RWMutex
+
+	ctx.Keys = map[string]any{}
+	for k, v := range c.Keys {
+		ctx.Keys[k] = v
+	}
+
+	ctx.Errors = c.Errors
+	errorsCopy := make(errorMsgs, len(ctx.Errors))
+	copy(errorsCopy, ctx.Errors)
+	ctx.Errors = errorsCopy
+
+	ctx.Accepted = c.Accepted
+	acceptedCopy := make([]string, len(ctx.Accepted))
+	copy(acceptedCopy, ctx.Accepted)
+	ctx.Accepted = acceptedCopy
+
+	// queryCache url.Values
+	// formCache url.Values
+	ctx.sameSite = c.sameSite
+
+	return ctx
+}
+
+// recycle
+func (c *Context) RecycleDump() {
+	c.engine.pool.Put(c)
+}
